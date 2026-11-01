@@ -13,7 +13,6 @@ export class RatScene extends Phaser.Scene {
   private level?: Level;
   private removed = new Set<number>();
   private ratImages = new Map<number, Phaser.GameObjects.Image>();
-  private labels = new Map<number, Phaser.GameObjects.Container>();
   private tails!: Phaser.GameObjects.Graphics;
   private effects!: Phaser.GameObjects.Graphics;
   private hover: number | null = null;
@@ -47,8 +46,8 @@ export class RatScene extends Phaser.Scene {
     if (!this.ready) { this.pending = { level, removed: new Set(removed) }; return; }
     this.epoch++;
     this.tweens.killAll(); this.clearHold();
-    this.ratImages.forEach(r => r.destroy()); this.labels.forEach(l => l.destroy());
-    this.ratImages.clear(); this.labels.clear(); this.effects.clear();
+    this.ratImages.forEach(r => r.destroy());
+    this.ratImages.clear(); this.effects.clear();
     this.level = level; this.removed = new Set(removed); this.busy = false; this.hover = null; this.hinted = null;
     level.rats.forEach(rat => {
       if (removed.has(rat.id)) return;
@@ -70,12 +69,6 @@ export class RatScene extends Phaser.Scene {
         else this.attempt(rat.id);
       });
       this.ratImages.set(rat.id, image);
-      const x = rat.position.x + Math.cos(rat.angle) * 61;
-      const y = rat.position.y + Math.sin(rat.angle) * 61;
-      const tag = this.add.container(x, y).setDepth(21);
-      const circle = this.add.graphics().fillStyle(0xfaf5e9, 0.98).fillCircle(0, 0, 13).lineStyle(1.3, 0xd4c4a7).strokeCircle(0, 0, 13);
-      const text = this.add.text(0, 0, String(rat.id + 1), { fontFamily: 'Georgia, serif', fontSize: '16px', color: '#736651' }).setOrigin(0.5, 0.5);
-      tag.add([circle, text]); this.labels.set(rat.id, tag);
     });
     this.draw();
   }
@@ -169,7 +162,6 @@ export class RatScene extends Phaser.Scene {
     this.busy = true; this.effects.clear();
     const rat = this.level.rats[id], image = this.ratImages.get(id)!;
     const epoch = this.epoch, state = { t: 0 };
-    this.labels.get(id)?.setVisible(false);
     this.tweens.add({
       targets: state, t: 1, duration: this.callbacks.reducedMotion() ? 90 : 680, ease: 'Cubic.easeIn',
       onUpdate: () => {
@@ -180,7 +172,7 @@ export class RatScene extends Phaser.Scene {
       },
       onComplete: () => {
         if (epoch !== this.epoch) return;
-        this.removed.add(id); image.destroy(); this.ratImages.delete(id); this.labels.get(id)?.destroy(); this.labels.delete(id);
+        this.removed.add(id); image.destroy(); this.ratImages.delete(id);
         this.busy = false; this.draw(); this.callbacks.onRelease(id);
       },
     });

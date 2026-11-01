@@ -170,8 +170,8 @@ scene.callbacks = {
     setStatus(completed ? 'Все на свободе. Ты распутал эту историю!' : `${level.rats[id].name} на свободе! Осталось ${level.rats.length - removed.size}.`, true);
     if (completed) completionTimer = setTimeout(showVictory, save.reducedMotion ? 100 : 400);
   },
-  onBlocked: (id, blocker) => { sound(true); setStatus(`${level.rats[id].name} пока не может уйти: хвост держит ${level.rats[blocker].name} (№ ${blocker + 1}).`, true); },
-  onInspect: id => { if (id !== null) setStatus(`Это ${level.rats[id].name}, № ${id + 1}. Проследи выделенный хвост до самого кончика.`); else setStatus('Нажми на крысу со свободным хвостом.'); },
+  onBlocked: (id, blocker) => { sound(true); setStatus(`${level.rats[id].name} пока не может уйти: хвост держит ${level.rats[blocker].name}.`, true); },
+  onInspect: id => { if (id !== null) setStatus(`Это ${level.rats[id].name}. Проследи выделенный хвост до самого кончика.`); else setStatus('Нажми на крысу со свободным хвостом.'); },
 };
 loadCurrent(); update();
 $('play-btn').onclick = () => showView('play');
@@ -181,7 +181,7 @@ $('sound-btn').onclick = () => { save.sound = !save.sound; persist(); update(); 
 $('new-btn').onclick = () => { if (!scene.isBusy()) startNew(); };
 $('hint-btn').onclick = () => {
   const id = scene.showHint();
-  if (id !== undefined) setStatus(`${level.rats[id].name} (№ ${id + 1}) может уйти: хвост нигде не прижат.`, true);
+  if (id !== undefined) setStatus(`${level.rats[id].name} может уйти: хвост нигде не прижат.`, true);
 };
 $('restart-btn').onclick = () => { if (scene.isBusy()) return; clearTimeout(completionTimer); save.removed = []; removed.clear(); persist(); loadCurrent(); setStatus('Начнём эту историю с начала.'); };
 $('undo-btn').onclick = () => {
