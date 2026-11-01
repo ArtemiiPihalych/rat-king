@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { type Level, type Point, blockers, availableRats, BOARD_SIZE } from './generator';
 import { PALETTES, createRatTextures } from './rat-art';
+import { tailPath } from './tail-geometry';
 
 export interface SceneCallbacks {
   onRelease: (id: number) => void;
@@ -79,9 +80,9 @@ export class RatScene extends Phaser.Scene {
     this.draw();
   }
   private clearHold(): void { this.hold?.remove(); this.hold = undefined; }
-  private path(points: Point[], width: number, color: number, alpha = 1): void {
-    const rounded: Point[] = [points[0]];
-    for (let i = 1; i < points.length - 1; i++) {
+  private path(points: Point[], width: number, color: number, alpha = 1, sampled = false): void {
+    const rounded: Point[] = sampled ? points : [points[0]];
+    for (let i = 1; !sampled && i < points.length - 1; i++) {
       const a = points[i - 1], corner = points[i], b = points[i + 1];
       const la = Math.hypot(corner.x - a.x, corner.y - a.y), lb = Math.hypot(b.x - corner.x, b.y - corner.y);
       if (la < 0.001 || lb < 0.001) { rounded.push(corner); continue; }
@@ -95,30 +96,34 @@ export class RatScene extends Phaser.Scene {
         rounded.push({ x: u * u * start.x + 2 * u * t * corner.x + t * t * end.x, y: u * u * start.y + 2 * u * t * corner.y + t * t * end.y });
       }
     }
-    rounded.push(points[points.length - 1]);
+    if (!sampled) rounded.push(points[points.length - 1]);
     this.tails.lineStyle(width, color, alpha);
     this.tails.beginPath(); this.tails.moveTo(rounded[0].x, rounded[0].y);
     for (const point of rounded.slice(1)) this.tails.lineTo(point.x, point.y);
     this.tails.strokePath();
     this.tails.fillStyle(color, alpha);
-    rounded.forEach(point => this.tails.fillCircle(point.x, point.y, width / 2));
+    (sampled ? [rounded[0], rounded[rounded.length - 1]] : rounded).forEach(point => this.tails.fillCircle(point.x, point.y, width / 2));
   }
   private tail(id: number, alpha: number, pointsOverride?: Point[]): void {
-    const rat = this.level!.rats[id], points = pointsOverride ?? rat.points;
+    const rat = this.level!.rats[id], points = pointsOverride ?? tailPath(rat);
     if (points.length < 2) return;
     const color = PALETTES[rat.color].tail;
-    this.path(points, 16, 0xf8f1e0, alpha);
-    this.path(points, 11.5, 0x685646, alpha * 0.85);
-    this.path(points, 8, color, alpha);
+    const sampled = !!rat.path;
+    this.path(points, sampled ? 18 : 16, 0xf8f1e0, alpha, sampled);
+    this.path(points, sampled ? 12 : 11.5, 0x685646, alpha * (sampled ? 0.26 : 0.85), sampled);
+    this.path(points, sampled ? 10 : 8, color, alpha, sampled);
     // Small transverse rings make each tail easier to trace without relying on color alone.
     this.tails.lineStyle(1.15, 0x534634, alpha * 0.28);
+    let nextRing = 17;
     for (let i = 1; i < points.length; i++) {
       const a = points[i - 1], b = points[i];
       const length = Math.hypot(b.x - a.x, b.y - a.y), nx = -(b.y - a.y) / length, ny = (b.x - a.x) / length;
-      for (let d = 17; d < length - 10; d += 25) {
+      if (length < 0.001) continue;
+      for (let d = sampled ? nextRing : 17; d < length - (sampled ? 0 : 10); d += 25) {
         const x = a.x + (b.x - a.x) * d / length, y = a.y + (b.y - a.y) * d / length;
         this.tails.lineBetween(x - nx * 2.7, y - ny * 2.7, x + nx * 2.7, y + ny * 2.7);
       }
+      if (sampled) { nextRing -= length; while (nextRing < 0) nextRing += 25; }
     }
   }
   private draw(animatedId?: number, progress = 0): void {
@@ -131,9 +136,10 @@ export class RatScene extends Phaser.Scene {
       if (animatedId === rat.id) {
         const image = this.ratImages.get(rat.id)!;
         const dx = image.x - rat.position.x, dy = image.y - rat.position.y;
-        const root = { x: rat.points[0].x + dx, y: rat.points[0].y + dy };
+        const basePath = tailPath(rat);
+        const root = { x: basePath[0].x + dx, y: basePath[0].y + dy };
         // A controlled extraction curve collapses the free tip toward the departing rat.
-        const points = rat.points.map((p, i) => i === 0 ? root : ({ x: p.x + dx + (root.x - p.x - dx) * progress, y: p.y + dy + (root.y - p.y - dy) * progress }));
+        const points = basePath.map((p, i) => i === 0 ? root : ({ x: p.x + dx + (root.x - p.x - dx) * progress, y: p.y + dy + (root.y - p.y - dy) * progress }));
         this.tail(rat.id, 1 - progress * 0.65, points);
       } else this.tail(rat.id, alpha);
     });

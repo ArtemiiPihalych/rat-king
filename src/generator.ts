@@ -1,10 +1,12 @@
 /** Deterministic geometry and game rules. No renderer or browser dependencies. */
 import { wovenRats } from './woven-paths';
-export const GENERATOR_VERSION = 2;
+import { curvedRats } from './curved-paths';
+import { analysePaths, tailPath } from './tail-geometry';
+export const GENERATOR_VERSION = 3;
 export const BOARD_SIZE = 840;
 export type Difficulty = 'cozy' | 'curious' | 'clever';
 export interface Point { x: number; y: number }
-export interface Rat { id: number; name: string; angle: number; position: Point; points: Point[]; rank: number; color: number }
+export interface Rat { id: number; name: string; angle: number; position: Point; points: Point[]; path?: Point[]; rank: number; color: number }
 export interface Crossing extends Point { a: number; b: number; over: number; under: number }
 export interface Level {
   seed: string; difficulty: Difficulty; version: number; rats: Rat[]; crossings: Crossing[];
@@ -99,13 +101,17 @@ function candidate(seed: string, difficulty: Difficulty, attempt: number, versio
       points: [radial(angle, radius - 29), radial(bend, 110 + random() * 68), radial(angle + turn, 202 + random() * 35)],
     };
   }) : [];
-  const geometry = version === 1 ? null : wovenRats(random, n);
+  const geometry = version === 1 ? null : version === 2 ? wovenRats(random, n) : curvedRats(random, n);
   if (version !== 1 && !geometry) return null;
   const rats: Rat[] = version === 1 ? legacyRats : geometry!.map((shape, id) => ({
     ...shape, id, name: NAMES[id], rank: ranks[id], color: colors[id],
   }));
   const crossings: Crossing[] = [];
-  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+  if (version >= 3) {
+    const analysed = analysePaths(rats.map(tailPath));
+    if (analysed.selfIntersection || analysed.shallowCrossing) return null;
+    for (const point of analysed.crossings) crossings.push({ ...point, over: rats[point.a].rank > rats[point.b].rank ? point.a : point.b, under: rats[point.a].rank > rats[point.b].rank ? point.b : point.a });
+  } else for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
     const a = rats[i], b = rats[j];
     for (let ai = 1; ai < a.points.length; ai++) for (let bi = 1; bi < b.points.length; bi++) {
       const point = intersect(a.points[ai - 1], a.points[ai], b.points[bi - 1], b.points[bi]);
@@ -129,7 +135,7 @@ function candidate(seed: string, difficulty: Difficulty, attempt: number, versio
   for (let i = 0; i < crossings.length; i++) {
     const crossing = crossings[i];
     for (let j = i + 1; j < crossings.length; j++) level.metrics.minSeparation = Math.min(level.metrics.minSeparation, distance(crossing, crossings[j]));
-    for (const id of [crossing.a, crossing.b]) for (const p of rats[id].points) {
+    for (const id of [crossing.a, crossing.b]) for (const p of (version >= 3 ? [tailPath(rats[id])[0], tailPath(rats[id]).at(-1)!] : rats[id].points)) {
       level.metrics.minSeparation = Math.min(level.metrics.minSeparation, distance(crossing, p));
     }
   }
@@ -143,7 +149,7 @@ export function validateLevel(level: Level): string[] {
   for (const rat of level.rats) {
     if (level.version >= 2 && (rat.points.length < 7 || rat.points.length > 8)) problems.push(`bend-count:${rat.id}`);
     if (!level.crossings.some(c => c.a === rat.id || c.b === rat.id)) problems.push(`isolated:${rat.id}`);
-    if (rat.points.some(p => p.x < 50 || p.x > 790 || p.y < 50 || p.y > 790)) problems.push(`outside:${rat.id}`);
+    if (tailPath(rat).some(p => p.x < 50 || p.x > 790 || p.y < 50 || p.y > 790)) problems.push(`outside:${rat.id}`);
   }
   for (const crossing of level.crossings) {
     if (level.rats[crossing.over].rank <= level.rats[crossing.under].rank) problems.push('invalid-order');
@@ -154,7 +160,7 @@ export function validateLevel(level: Level): string[] {
 
 /** Never repairs a blocked puzzle by silently deleting a rat: reject the candidate instead. */
 export function generateLevel(seed: string, difficulty: Difficulty = 'curious', version = GENERATOR_VERSION): Level {
-  if (version !== 1 && version !== 2) throw new Error(`Неизвестная версия клубка: ${version}`);
+  if (![1, 2, 3].includes(version)) throw new Error(`Неизвестная версия клубка: ${version}`);
   seed = seed.toLowerCase();
   let best: Level | undefined;
   let bestScore = Infinity;
@@ -168,7 +174,7 @@ export function generateLevel(seed: string, difficulty: Difficulty = 'curious', 
     const score = Math.abs(level.crossings.length - targetCrossings) + Math.abs(level.metrics.depth - targetDepth) * 2 + Math.abs(level.metrics.available - 2) * 2;
     if (score < bestScore) { best = level; bestScore = score; }
     if (score <= 2) return level;
-    if (attempt > 120 && best) break;
+    if (attempt > (version >= 3 ? 24 : 120) && best) break;
   }
   if (!best) throw new Error(`Не удалось создать читаемый клубок: ${seed}/${difficulty}`);
   return best;
@@ -178,7 +184,7 @@ export function levelCode(seed: string, difficulty: Difficulty, version = GENERA
   return `RK${version}-${difficulty === 'cozy' ? 'U' : difficulty === 'curious' ? 'L' : 'H'}-${seed}`;
 }
 export function parseCode(code: string): { seed: string; difficulty: Difficulty; version: number } | null {
-  const match = /^RK([12])-([ULH])-([A-Za-z0-9_-]{1,48})$/i.exec(code.trim());
+  const match = /^RK([123])-([ULH])-([A-Za-z0-9_-]{1,48})$/i.exec(code.trim());
   if (!match) return null;
   return { difficulty: ({ U: 'cozy', L: 'curious', H: 'clever' } as const)[match[2].toUpperCase() as 'U' | 'L' | 'H'], seed: match[3].toLowerCase(), version: Number(match[1]) };
 }

@@ -106,7 +106,9 @@ function loadCurrent(): void {
   clearTimeout(completionTimer);
   $('board-loading').hidden = false;
   try {
-    level = generateLevel(save.seed, save.difficulty, save.generationVersion);
+    if (!level || level.seed !== save.seed || level.difficulty !== save.difficulty || level.version !== save.generationVersion) {
+      level = generateLevel(save.seed, save.difficulty, save.generationVersion);
+    }
     // Validate a restored move sequence; a damaged save must not remove arbitrary blocked rats.
     const valid = new Set<number>();
     for (const id of save.removed) {
@@ -142,7 +144,7 @@ function startNew(difficulty: Difficulty = save.difficulty, seed?: string, numbe
   if (!seed) {
     for (let retry = 0; retry < 12; retry++) {
       const candidate = generateLevel(nextSeed, difficulty, version);
-      if (!save.fingerprints.includes(candidate.fingerprint)) break;
+      if (!save.fingerprints.includes(candidate.fingerprint)) { level = candidate; break; }
       nextSeed += 'x';
     }
   }
@@ -190,7 +192,7 @@ $('help-btn').onclick = () => openDialog(`<h2>У каждого хвоста<br>
 $('help-btn').addEventListener('click', () => { $('got-it').onclick = closeDialog; });
 
 function openLevels(): void {
-  openDialog(`<h2>Какой клубок<br>распутаем?</h2><p>У каждой истории — свой узор хвостов.</p><div class="difficulty-options">${(Object.keys(DIFFICULTIES) as Difficulty[]).map(d => `<button class="difficulty-option ${save.difficulty === d ? 'selected' : ''}" data-difficulty="${d}"><span>${d === 'cozy' ? '⌁' : d === 'curious' ? '❧' : '✧'}</span><div><strong>${DIFFICULTIES[d].label}</strong><small>${DIFFICULTIES[d].description}</small></div>${icon('arrow',18)}</button>`).join('')}</div><button id="daily-btn" class="daily-button">${icon('leaf')} Клубок дня <span>один для всех</span></button><div class="code-entry"><label for="level-code-input">Или открой клубок по коду</label><div><input id="level-code-input" autocomplete="off" autocapitalize="characters" placeholder="RK2-U-attic-1" maxlength="60"/><button class="secondary-button" id="load-code-btn">Открыть</button></div><p id="code-error" class="input-error" role="status"></p></div>`, 'КОЛЛЕКЦИЯ ИСТОРИЙ');
+  openDialog(`<h2>Какой клубок<br>распутаем?</h2><p>У каждой истории — свой узор хвостов.</p><div class="difficulty-options">${(Object.keys(DIFFICULTIES) as Difficulty[]).map(d => `<button class="difficulty-option ${save.difficulty === d ? 'selected' : ''}" data-difficulty="${d}"><span>${d === 'cozy' ? '⌁' : d === 'curious' ? '❧' : '✧'}</span><div><strong>${DIFFICULTIES[d].label}</strong><small>${DIFFICULTIES[d].description}</small></div>${icon('arrow',18)}</button>`).join('')}</div><button id="daily-btn" class="daily-button">${icon('leaf')} Клубок дня <span>один для всех</span></button><div class="code-entry"><label for="level-code-input">Или открой клубок по коду</label><div><input id="level-code-input" autocomplete="off" autocapitalize="characters" placeholder="RK3-U-attic-1" maxlength="60"/><button class="secondary-button" id="load-code-btn">Открыть</button></div><p id="code-error" class="input-error" role="status"></p></div>`, 'КОЛЛЕКЦИЯ ИСТОРИЙ');
   document.querySelectorAll<HTMLButtonElement>('[data-difficulty]').forEach(b => b.onclick = () => startNew(b.dataset.difficulty as Difficulty));
   $('daily-btn').onclick = () => {
     const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yekaterinburg', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replaceAll('-', '');
@@ -198,7 +200,7 @@ function openLevels(): void {
   };
   const submit = () => {
     const parsed = parseCode($<HTMLInputElement>('level-code-input').value);
-    if (!parsed) { $('code-error').textContent = 'Проверь код: например, RK2-U-attic-1.'; return; }
+    if (!parsed) { $('code-error').textContent = 'Проверь код: например, RK3-U-attic-1.'; return; }
     startNew(parsed.difficulty, parsed.seed, save.number + 1, parsed.version);
   };
   $('load-code-btn').onclick = submit;

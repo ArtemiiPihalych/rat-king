@@ -15,7 +15,7 @@ function shuffled<T>(array: T[], random: () => number): T[] {
 }
 
 /** Route on shared lanes. Crossings can only be straight-over-straight, never corners or tips. */
-export function wovenRats(random: () => number, count: number): WovenRat[] | null {
+export function wovenRats(random: () => number, count: number, maximumLength = 8): WovenRat[] | null {
   const occupied = new Map<number, Cell[]>();
   const sideOffset = Math.floor(random() * 4);
   const rotation = Math.floor(random() * 4);
@@ -80,7 +80,7 @@ export function wovenRats(random: () => number, count: number): WovenRat[] | nul
       ], random);
       for (const direction of directions) {
         // First segment enters from a rat outside the lanes; all subsequent corners stay inside.
-        const lengths = shuffled(Array.from({ length: segment === 0 ? 10 : 7 }, (_, i) => i + 2), random);
+        const lengths = shuffled(Array.from({ length: segment === 0 ? 10 : maximumLength - 1 }, (_, i) => i + 2), random);
         for (const length of lengths) {
           const start = segment === 0
             ? { x: Math.max(ORIGIN, Math.min(ORIGIN + LAST * STEP, previous.x)), y: Math.max(ORIGIN, Math.min(ORIGIN + LAST * STEP, previous.y)) }
