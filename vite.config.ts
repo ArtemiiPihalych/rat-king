@@ -1,0 +1,11 @@
+import { defineConfig } from 'vite';
+
+export default defineConfig(({ mode }) => ({
+  base: mode === 'production' ? '/rat-king/' : '/',
+  server: { host: '0.0.0.0', port: 5173, strictPort: true },
+  preview: { host: '0.0.0.0', port: 4173, strictPort: true },
+  build: {
+    rollupOptions: { output: { manualChunks: { phaser: ['phaser'] } } },
+    chunkSizeWarningLimit: 1500,
+  },
+}));

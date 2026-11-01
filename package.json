@@ -1,0 +1,21 @@
+{
+  "name": "rat-king",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node tools/run.mjs dev",
+    "build": "node tools/run.mjs build",
+    "preview": "node tools/run.mjs preview",
+    "test": "node tools/run.mjs test",
+    "check": "node tools/run.mjs check"
+  },
+  "dependencies": {
+    "phaser": "3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vite": "^7.2.2",
+    "tsx": "^4.20.6"
+  }
+}
